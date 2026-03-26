@@ -1,5 +1,6 @@
 {
   "name": "lynx",
+  "homepage": "https://VishruthC.github.io/Lynx",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +9,8 @@
     "build": "vite build --emptyOutDir",
     "build:android": "npm run clean && npm run build && npx cap sync && cd android && .\\gradlew.bat clean assembleDebug",
     "clean": "rm -rf dist && Remove-Item -Path dist, android/app/src/main/assets/public -Recurse -Force -ErrorAction SilentlyContinue",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
