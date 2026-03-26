@@ -1,7 +1,7 @@
 # Lynx - Freedom of Music
 
 <div align="center">
-  <img src="C:\Users\naidu\.gemini\antigravity\brain\0e4b47cd-3f05-498b-9e83-ffa92dff6fc7\media__1774544492402.png" alt="Lynx Desktop Interface" width="100%">
+  <img src="screenshots/desktop.png" alt="Lynx Desktop Interface" width="100%">
 </div>
 
 Lynx is a minimalist, premium music streaming application designed for those who value privacy, speed, and visual excellence. Built with a modern "Liquid Glass" aesthetic, Lynx offers a seamless experience across desktop and mobile.
@@ -18,7 +18,7 @@ Lynx is a minimalist, premium music streaming application designed for those who
 ## 📱 Mobile Experience
 
 <div align="center">
-  <img src="C:\Users\naidu\.gemini\antigravity\brain\0e4b47cd-3f05-498b-9e83-ffa92dff6fc7\media__1774544515976.png" alt="Lynx Mobile Interface" width="300">
+  <img src="screenshots/mobile.png" alt="Lynx Mobile Interface" width="300">
 </div>
 
 ## 🛠️ Technical Stack
