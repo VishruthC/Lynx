@@ -1,0 +1,5 @@
+{
+  "name": "Lynx",
+  "description": "A Tidal-inspired music streaming app using the YouTube Piped API.",
+  "requestFramePermissions": []
+}

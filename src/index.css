@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@layer base {
+
+  /* Custom Scrollbar Styles - Desktop */
+  @media (min-width: 768px) {
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background-color: transparent;
+      border-radius: 20px;
+      background-clip: content-box;
+      border: 1px solid transparent;
+    }
+
+    *:hover::-webkit-scrollbar-thumb {
+      background-color: #27272a;
+    }
+
+    /* Support for Firefox (Self-hiding / thin) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #27272a transparent;
+    }
+  }
+
+  /* Mobile: Let OS handle native auto-hiding scrollbars */
+  @media (max-width: 767px) {
+    ::-webkit-scrollbar {
+      display: none;
+    }
+
+    * {
+      scrollbar-width: none;
+    }
+  }
+
+  @keyframes marquee-scroll {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-marquee {
+    animation: marquee-scroll linear infinite;
+    display: inline-block;
+  }
+
+  /* Hide Scrollbar Utility */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.glass-morphism {
+  background: rgba(30, 30, 35, 0.45);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+.liquid-glass-border {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.1),
+    0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+.active-nav-bg {
+  background: rgba(39, 39, 42, 0.8);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+}
