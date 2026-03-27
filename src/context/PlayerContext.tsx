@@ -89,13 +89,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     function initPlayer() {
       const playerDiv = document.createElement('div');
       playerDiv.id = 'youtube-player-container';
-      playerDiv.style.position = 'absolute';
-      playerDiv.style.top = '-9999px';
-      playerDiv.style.left = '-9999px';
-      playerDiv.style.width = '200px';
-      playerDiv.style.height = '200px';
-      playerDiv.style.opacity = '0';
+      playerDiv.style.position = 'fixed';
+      playerDiv.style.bottom = 'env(safe-area-inset-bottom, 0px)';
+      playerDiv.style.right = '0';
+      playerDiv.style.width = '1px';
+      playerDiv.style.height = '1px';
+      playerDiv.style.opacity = '0.01';
       playerDiv.style.pointerEvents = 'none';
+      playerDiv.style.zIndex = '-1';
       document.body.appendChild(playerDiv);
 
       playerRef.current = new window.YT.Player('youtube-player-container', {
