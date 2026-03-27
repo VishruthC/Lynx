@@ -52,7 +52,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState(false);
   const [isBackground, setIsBackground] = useState(false);
 
-  const playerRef = useRef<HTMLAudioElement | null>(null);
+  const playerRef = useRef<any>(null);
   const timeUpdateIntervalRef = useRef<number | null>(null);
   const isTransitioningRef = useRef(false);
   const nativeAssetIdRef = useRef<string | null>(null);
@@ -72,55 +72,92 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsBackground(!isActive);
     });
 
-    // Initialize Native Audio Element for Web/Foreground
-    const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    playerRef.current = audio;
+    // Load YouTube Iframe API
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleWaiting = () => setIsLoading(true);
-    const handlePlaying = () => {
-      setIsLoading(false);
-      setIsPlaying(true);
-      setDuration(audio.duration);
-    };
-    const handleEnded = () => {
-      setIsPlaying(false);
-      handleTrackEnded();
-    };
-    const handleMetadata = () => setDuration(audio.duration);
-    const handleError = (e: any) => {
-      console.error('Audio Player Error:', e);
-      setIsLoading(false);
-      next();
-    };
+      window.onYouTubeIframeAPIReady = () => {
+        initPlayer();
+      };
+    } else {
+      initPlayer();
+    }
 
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('waiting', handleWaiting);
-    audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('loadedmetadata', handleMetadata);
-    audio.addEventListener('error', handleError);
+    function initPlayer() {
+      const playerDiv = document.createElement('div');
+      playerDiv.id = 'youtube-player-container';
+      playerDiv.style.position = 'absolute';
+      playerDiv.style.top = '-9999px';
+      playerDiv.style.left = '-9999px';
+      playerDiv.style.width = '200px';
+      playerDiv.style.height = '200px';
+      playerDiv.style.opacity = '0';
+      playerDiv.style.pointerEvents = 'none';
+      document.body.appendChild(playerDiv);
+
+      playerRef.current = new window.YT.Player('youtube-player-container', {
+        height: '200',
+        width: '200',
+        videoId: '',
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: (event: any) => {
+            event.target.setVolume(volume * 100);
+          },
+          onStateChange: (event: any) => {
+            if (isBackground || isTransitioningRef.current) return;
+
+            if (event.data === 1) {
+              setIsPlaying(true);
+              setIsLoading(false);
+              setDuration(event.target.getDuration());
+              startProgressTimer();
+            } else if (event.data === 2) {
+              setIsPlaying(false);
+              stopProgressTimer();
+            } else if (event.data === 3) {
+              setIsLoading(true);
+            } else if (event.data === 0) {
+              setIsPlaying(false);
+              stopProgressTimer();
+              handleEnded();
+            } else if (event.data === -1) {
+              event.target.playVideo();
+            }
+          },
+          onError: (event: any) => {
+            console.error('YouTube Player Error:', event.data);
+            setIsLoading(false);
+            if (!isBackground) handleEnded();
+          }
+        }
+      });
+    }
 
     return () => {
       stopProgressTimer();
       appStateListener.then(l => l.remove());
-      audio.pause();
-      audio.src = '';
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('waiting', handleWaiting);
-      audio.removeEventListener('playing', handlePlaying);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('loadedmetadata', handleMetadata);
-      audio.removeEventListener('error', handleError);
+      if (playerRef.current && playerRef.current.destroy) {
+        playerRef.current.destroy();
+      }
       if (nativeAssetIdRef.current) {
         NativeAudio.stop({ assetId: nativeAssetIdRef.current });
         NativeAudio.unload({ assetId: nativeAssetIdRef.current });
         nativeAssetIdRef.current = null;
       }
+      const container = document.getElementById('youtube-player-container');
+      if (container) container.remove();
       stopForegroundService();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -135,7 +172,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         try {
           isTransitioningRef.current = true;
           const streamUrl = await getStreamUrl(currentTrack.id);
-          const time = playerRef.current?.currentTime || currentTime;
+          const time = playerRef.current?.getCurrentTime() || currentTime;
 
           nativeAssetIdRef.current = currentTrack.id;
 
@@ -156,15 +193,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             time: time
           });
 
-          if (playerRef.current) playerRef.current.pause();
+          // Pause YouTube only after native starts to avoid silence
+          if (playerRef.current?.pauseVideo) playerRef.current.pauseVideo();
         } catch (e) {
           console.error('Background transition failed:', e);
         } finally {
           isTransitioningRef.current = false;
         }
       } else if (!isBackground && isPlaying) {
-        // Returning to Foreground: Start Web Audio
-        if (playerRef.current) {
+        // Returning to Foreground: Start YouTube
+        if (playerRef.current?.playVideo) {
           try {
             let time = currentTime;
             if (nativeAssetIdRef.current) {
@@ -174,11 +212,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               await NativeAudio.unload({ assetId: nativeAssetIdRef.current });
               nativeAssetIdRef.current = null;
             }
-            playerRef.current.currentTime = time;
-            playerRef.current.play();
+            playerRef.current.seekTo(time, true);
+            playerRef.current.playVideo();
           } catch (e) {
             console.error('Foreground transition failed:', e);
-            playerRef.current.play();
+            playerRef.current.playVideo();
           }
         }
       }
@@ -244,10 +282,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (isPlaying) {
       startForegroundService();
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-      startProgressTimer();
     } else {
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-      stopProgressTimer();
     }
   }, [currentTrack, isPlaying]);
 
@@ -266,16 +302,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
           console.error('Failed to get native time:', e);
         }
-      } else if (playerRef.current) {
-        time = playerRef.current.currentTime;
-        dur = playerRef.current.duration;
+      } else if (playerRef.current && playerRef.current.getCurrentTime) {
+        time = playerRef.current.getCurrentTime();
+        dur = playerRef.current.getDuration();
       }
 
-      if (time >= 0) {
+      if (time > 0) {
         setCurrentTime(time);
-        if (!isNaN(dur)) setDuration(dur);
+        setDuration(dur);
 
-        if ('mediaSession' in navigator && !isNaN(dur)) {
+        if ('mediaSession' in navigator) {
           navigator.mediaSession.setPositionState({
             duration: dur || 0,
             playbackRate: 1,
@@ -293,13 +329,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleTrackEnded = async () => {
+  const handleEnded = async () => {
     if (nativeAssetIdRef.current) {
       await NativeAudio.stop({ assetId: nativeAssetIdRef.current });
       await NativeAudio.unload({ assetId: nativeAssetIdRef.current });
       nativeAssetIdRef.current = null;
     }
-    document.dispatchEvent(new CustomEvent('trackEndedEvent'));
+    document.dispatchEvent(new CustomEvent('trackEnded'));
   };
 
   useEffect(() => {
@@ -311,9 +347,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         next();
       }
     };
-    document.addEventListener('trackEndedEvent', onTrackEnded);
-    return () => document.removeEventListener('trackEndedEvent', onTrackEnded);
-  }, [currentTrack, queue, repeatMode, isShuffle, isBackground]);
+    document.addEventListener('trackEnded', onTrackEnded);
+    return () => document.removeEventListener('trackEnded', onTrackEnded);
+  }, [currentTrack, queue, repeatMode, isShuffle, isBackground]); // Re-bind when state changes
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     if (newQueue) setQueue(newQueue);
@@ -330,9 +366,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const streamUrl = await getStreamUrl(track.id);
-
       if (isBackground && Capacitor.getPlatform() === 'android') {
+        // If playing while already in background, use native immediately
+        const streamUrl = await getStreamUrl(track.id);
         nativeAssetIdRef.current = track.id;
         await NativeAudio.preload({
           assetId: track.id,
@@ -348,9 +384,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         await NativeAudio.play({ assetId: track.id });
         setIsPlaying(true);
         setIsLoading(false);
-      } else if (playerRef.current) {
-        playerRef.current.src = streamUrl;
-        playerRef.current.play();
+      } else if (playerRef.current && playerRef.current.loadVideoById) {
+        playerRef.current.loadVideoById(track.id);
+      } else {
+        // Player not ready yet, wait a bit
+        setTimeout(() => {
+          if (playerRef.current && playerRef.current.loadVideoById) {
+            playerRef.current.loadVideoById(track.id);
+          }
+        }, 1000);
       }
     } catch (error) {
       console.error('Failed to play track:', error);
@@ -362,8 +404,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (isBackground && nativeAssetIdRef.current) {
       await NativeAudio.pause({ assetId: nativeAssetIdRef.current });
       setIsPlaying(false);
-    } else if (playerRef.current) {
-      playerRef.current.pause();
+    } else if (playerRef.current && playerRef.current.pauseVideo) {
+      playerRef.current.pauseVideo();
     }
     stopForegroundService();
   };
@@ -372,8 +414,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (isBackground && nativeAssetIdRef.current) {
       await NativeAudio.resume({ assetId: nativeAssetIdRef.current });
       setIsPlaying(true);
-    } else if (playerRef.current) {
-      playerRef.current.play();
+    } else if (playerRef.current && playerRef.current.playVideo) {
+      playerRef.current.playVideo();
     }
     startForegroundService();
   };
@@ -431,8 +473,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (nativeAssetIdRef.current) {
       await NativeAudio.setVolume({ assetId: nativeAssetIdRef.current, volume: vol });
     }
-    if (playerRef.current) {
-      playerRef.current.volume = vol;
+    if (playerRef.current && playerRef.current.setVolume) {
+      playerRef.current.setVolume(vol * 100);
     }
   };
 
@@ -440,8 +482,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (isBackground && nativeAssetIdRef.current) {
       await NativeAudio.setCurrentTime({ assetId: nativeAssetIdRef.current, time: time });
       setCurrentTime(time);
-    } else if (playerRef.current) {
-      playerRef.current.currentTime = time;
+    } else if (playerRef.current && playerRef.current.seekTo) {
+      playerRef.current.seekTo(time, true);
       setCurrentTime(time);
     }
   };
